@@ -1,0 +1,228 @@
+1.
+CREATE OR REPLACE TYPE samochod AS OBJECT (
+    marka VARCHAR2(20),
+    model VARCHAR2(20),
+    kilometry NUMBER,
+    data_produkcji DATE,
+    cena NUMBER(10,2)
+);
+CREATE TABLE samochody of samochod;
+INSERT INTO samochody VALUES
+(new samochod('Fiat', 'BRAVA', 60000, '1999-11-30', 25000));
+INSERT INTO samochody VALUES
+(new samochod('Ford', 'MONDEO', 80000, '1997-05-11', 45000));
+INSERT INTO samochody VALUES
+(new samochod('Mazda', '323', 12000, '3000-09-22', 52000));
+
+2.
+CREATE TABLE wlasciciele (
+imie VARCHAR2(100),
+nazwisko VARCHAR2(100),
+auto samochod
+)
+INSERT INTO wlasciciele VALUES
+('Jan', 'Kowalski', new samochod('Fiat', 'SEICENTO', 30000, '2010-12-02', 19500));
+INSERT INTO wlasciciele VALUES
+('Adam', 'Nowak', new samochod('Opel', 'ASTRA', 34000, '2009-06-01', 33700));
+
+3.
+ALTER TYPE samochod ADD MEMBER FUNCTION wartosc
+    RETURN NUMBER CASCADE INCLUDING TABLE DATA;
+CREATE OR REPLACE TYPE BODY samochod AS
+    MEMBER FUNCTION wartosc RETURN NUMBER IS
+    BEGIN
+        RETURN cena * POWER(0.9, EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM data_produkcji));
+    END wartosc;
+END;
+
+4.
+ALTER TYPE samochod ADD MAP MEMBER FUNCTION odzworuj
+    RETURN NUMBER CASCADE INCLUDING TABLE DATA;
+CREATE OR REPLACE TYPE BODY samochod AS
+    MEMBER FUNCTION wartosc RETURN NUMBER IS
+    BEGIN
+        RETURN cena * POWER(0.9, EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM data_produkcji));
+    END wartosc;
+    MAP MEMBER FUNCTION odzworuj RETURN NUMBER IS
+    BEGIN
+        RETURN EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM data_produkcji) * 10000 + kilometry;
+    END odzworuj;
+END;
+
+5.
+CREATE OR REPLACE TYPE wlasciciel AS OBJECT (
+    imie VARCHAR2(100),
+    nazwisko VARCHAR2(100)
+);
+ALTER TYPE samochod ADD ATTRIBUTE
+    wlasc REF wlasciciel CASCADE INCLUDING TABLE DATA;
+
+7.
+DECLARE
+    TYPE t_ksiazki IS
+        VARRAY(10) OF VARCHAR2(20);
+    tyt_ksiazek t_ksiazki := t_ksiazki('');
+BEGIN
+    tyt_ksiazek.extend(4);
+    FOR i IN 1..5 LOOP
+        tyt_ksiazek(i) := 'KSIAZKA_' || i;
+    END LOOP;
+    
+    tyt_ksiazek.extend(2,5);
+    tyt_ksiazek.trim(1);
+    tyt_ksiazek(6) := 'ksiazka__';
+    
+    FOR i IN tyt_ksiazek.first()..tyt_ksiazek.last() LOOP
+        dbms_output.put_line(tyt_ksiazek(i));
+    END LOOP;
+
+END;
+
+9.
+DECLARE
+    TYPE t_months IS
+        TABLE OF VARCHAR2(10);
+    my_months t_months := t_months();
+BEGIN
+    my_months.extend(12);
+    my_months(1) := 'JANUARY';
+    my_months(2) := 'FEBRUARY';
+    my_months(3) := 'MARCH';
+    my_months(4) := 'APRIL';
+    my_months(5) := 'MAY';
+    my_months(6) := 'JUNE';
+    my_months(7) := 'JULY';
+    my_months(8) := 'AUGUST';
+    my_months(9) := 'SEPTEMBER';
+    my_months(10) := 'OCTOBER';
+    my_months(11) := 'NOVEMBER';
+    my_months(12) := 'DECEMBER';
+    
+    my_months.delete(2,11);
+    
+    FOR i IN my_months.first()..my_months.last() LOOP
+        IF my_months.EXISTS(i) THEN
+            dbms_output.put_line(my_months(i));
+        END IF;
+    END LOOP;
+    
+END;
+
+11.
+CREATE TYPE KOSZYK_PRODUKTOW AS
+    TABLE OF VARCHAR2(20);
+/
+
+CREATE TYPE koszyk AS OBJECT (
+    n_id    NUMBER,
+    produkty KOSZYK_PRODUKTOW
+);
+/
+
+CREATE TABLE ZAKUPY OF koszyk
+NESTED TABLE produkty STORE AS nt_produkty;
+
+INSERT INTO ZAKUPY VALUES ( koszyk(0, KOSZYK_PRODUKTOW('SER', 'MLEKO', 'KAWIOR')) );
+INSERT INTO ZAKUPY VALUES ( koszyk(1, KOSZYK_PRODUKTOW('PIELUSZKI', 'PIWO')) );
+INSERT INTO ZAKUPY VALUES ( koszyk(3, KOSZYK_PRODUKTOW('MLEKO', 'SOK')) );
+INSERT INTO ZAKUPY VALUES ( koszyk(4, KOSZYK_PRODUKTOW('PIWO')) );
+INSERT INTO ZAKUPY VALUES ( koszyk(5, KOSZYK_PRODUKTOW('SARDYNKI', 'KAWA', 'SER')) );
+INSERT INTO ZAKUPY VALUES ( koszyk(6, KOSZYK_PRODUKTOW('CHLEB', 'PIWO', 'PIELUSZKI')) );
+
+SELECT *  FROM ZAKUPY;
+
+DELETE FROM ZAKUPY WHERE n_id = (SELECT z.n_id FROM ZAKUPY z, TABLE(z.produkty) p WHERE p.column_value='SARDYNKI') ;
+
+SELECT * FROM ZAKUPY;
+
+DELETE FROM ZAKUPY;
+
+22.
+CREATE OR REPLACE TYPE pisarz AS OBJECT (
+    id_pisarza NUMBER,
+    nazwisko VARCHAR2(20),
+    data_ur DATE,
+    MEMBER FUNCTION ile_ksiazek RETURN NUMBER
+);
+CREATE OR REPLACE TYPE ksiazka AS OBJECT (
+    id_ksiazki NUMBER,
+    pisarz_ref REF pisarz,
+    tytul VARCHAR2(50),
+    data_wydania DATE,
+    MEMBER FUNCTION wiek RETURN NUMBER
+);
+
+CREATE OR REPLACE TYPE BODY pisarz  AS
+    MEMBER FUNCTION ile_ksiazek RETURN NUMBER IS
+    ile_count NUMBER;
+    BEGIN
+        SELECT count(*) INTO ile_count FROM ksiazki k WHERE k.ID_PISARZA = SELF.id_pisarza;
+        RETURN ile_count;
+    END ile_ksiazek;
+END;
+CREATE OR REPLACE TYPE BODY ksiazka  AS
+    MEMBER FUNCTION wiek RETURN NUMBER IS
+    BEGIN
+        RETURN (EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM data_wydania));
+    END wiek;
+END;
+
+CREATE OR REPLACE VIEW PisarzeObjView OF pisarz
+WITH OBJECT IDENTIFIER (id_pisarza) AS
+    SELECT id_pisarza, nazwisko, data_ur
+    FROM pisarze;
+CREATE OR REPLACE VIEW KsiazkiObjView OF ksiazka
+WITH OBJECT IDENTIFIER (id_ksiazki) AS
+    SELECT id_ksiazki, MAKE_REF(PisarzeObjView,id_pisarza), tytul, data_wydania
+    FROM ksiazki;
+
+23.
+CREATE OR REPLACE TYPE auto_osobowe UNDER auto (
+    liczba_miejsc NUMBER,
+    klima VARCHAR2(3),
+    OVERRIDING MEMBER FUNCTION wartosc RETURN NUMBER
+);
+CREATE OR REPLACE TYPE auto_ciezarowe UNDER auto (
+    ladownosc NUMBER,
+    OVERRIDING MEMBER FUNCTION wartosc RETURN NUMBER
+);
+
+CREATE OR REPLACE TYPE BODY auto_osobowe AS
+    OVERRIDING MEMBER FUNCTION wartosc RETURN NUMBER IS
+        wiek    NUMBER;
+        wartosc NUMBER;
+    BEGIN
+        wiek := round(months_between(sysdate, data_produkcji) / 12);
+        wartosc := cena - ( wiek * 0.1 * cena );
+        IF ( wartosc < 0 ) THEN
+            wartosc := 0;
+        END IF;
+        IF ( klima = 'tak' ) THEN
+            wartosc := wartosc * 1.5;
+        END IF;
+        RETURN wartosc;
+    END wartosc;
+END;
+CREATE OR REPLACE TYPE BODY auto_ciezarowe AS
+    OVERRIDING MEMBER FUNCTION wartosc RETURN NUMBER IS
+        wiek    NUMBER;
+        wartosc NUMBER;
+    BEGIN
+        wiek := round(months_between(sysdate, data_produkcji) / 12);
+        wartosc := cena - ( wiek * 0.1 * cena );
+        IF ( wartosc < 0 ) THEN
+            wartosc := 0;
+        END IF;
+        IF ( ladownosc > 10 ) THEN
+            wartosc := wartosc * 2;
+        END IF;
+        RETURN wartosc;
+    END wartosc;
+END;
+
+INSERT INTO AUTA VALUES (AUTO_OSOBOWE('FIAT','SEICENTO',190000,DATE '1995-11-30',15000,4,'nie'));
+INSERT INTO AUTA VALUES (AUTO_OSOBOWE('FORD','FIESTA',50000,DATE '2003-06-12',30000,5,'tak'));
+INSERT INTO AUTA VALUES (AUTO_CIEZAROWE('VOLVO','XT',250000,DATE '2017-01-31',300000,12));
+INSERT INTO AUTA VALUES (AUTO_CIEZAROWE('IVECO','500',150000,DATE '2010-07-13',160000,8));
+
+select marka, a.wartosc() from auta a;
