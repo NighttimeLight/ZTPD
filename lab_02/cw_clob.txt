@@ -1,0 +1,105 @@
+1.
+CREATE TABLE dokumenty (
+    id NUMBER(12) PRIMARY KEY,
+    dokument CLOB);
+
+2.
+DECLARE 
+    clb CLOB; 
+BEGIN 
+    clb := '';
+    FOR i IN 1 .. 10000 LOOP 
+      clb := clb || 'Oto tekst. ';
+    END LOOP;
+    INSERT INTO dokumenty
+        VALUES (1, clb);
+    COMMIT;
+END;
+
+3.
+SELECT * FROM dokumenty;
+SELECT UPPER(dokument) FROM dokumenty;
+SELECT LENGTH(dokument) FROM dokumenty;
+SELECT DBMS_LOB.GETLENGTH(dokument) FROM dokumenty;
+SELECT SUBSTR(dokument,5,1000) FROM dokumenty;
+SELECT DBMS_LOB.SUBSTR(dokument,1000,5) FROM dokumenty;
+
+4.
+INSERT INTO dokumenty
+    VALUES (2, EMPTY_CLOB());
+
+5.
+INSERT INTO dokumenty
+    VALUES (3, NULL);
+COMMIT;
+
+7.
+SELECT directory_name, directory_path FROM dba_directories;
+
+8.
+DECLARE 
+    lobd clob;
+    fils BFILE := BFILENAME('ZSBD_DIR','dokument.txt');
+    dest_offset integer := 1;
+    src_offset integer := 1;
+    lang_context integer := 0;
+    warning integer := null;
+BEGIN 
+    SELECT dokument INTO lobd
+        FROM dokumenty
+        WHERE id=2
+        FOR UPDATE;
+    DBMS_LOB.fileopen(fils, DBMS_LOB.file_readonly);
+    DBMS_LOB.LOADCLOBFROMFILE(lobd, fils, DBMS_LOB.LOBMAXSIZE,
+        dest_offset, src_offset, 0, lang_context, warning);
+    DBMS_LOB.FILECLOSE(fils);
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('Warning: '||warning);
+END;
+
+9.
+UPDATE dokumenty
+    SET dokument = TO_CLOB(BFILENAME('ZSBD_DIR','dokument.txt'))
+    WHERE id = 3;
+
+10.
+SELECT * FROM dokumenty;
+
+11.
+SELECT DBMS_LOB.GETLENGTH(dokument) FROM dokumenty;
+
+12.
+DROP TABLE dokumenty;
+
+13.
+CREATE OR REPLACE PROCEDURE CLOB_CENSOR(clb IN OUT CLOB, w IN VARCHAR2) IS
+    dots VARCHAR2(50) := '.';
+    rep NUMBER(12);
+    pos NUMBER(12);
+BEGIN
+    FOR i IN 2 .. LENGTH(w) LOOP 
+      dots := dots || '.';
+    END LOOP;
+    SELECT REGEXP_COUNT(clb,w) INTO rep FROM DUAL;
+    FOR i IN 1 .. rep LOOP
+        SELECT INSTR(clb, w) INTO pos FROM dual;
+        DBMS_LOB.WRITE(clb, LENGTH(dots), pos, dots);
+    END LOOP;
+END;
+
+14.
+CREATE TABLE biographies AS SELECT * FROM ZSBD_TOOLS.biographies;
+
+15.
+DECLARE
+  clb CLOB;
+BEGIN
+  SELECT bio INTO clb
+    FROM biographies
+    WHERE person = 'Jara Cimrman'
+    FOR UPDATE;
+  CLOB_CENSOR(clb, 'Cimrman');
+END;
+
+16.
+DROP TABLE biographies;

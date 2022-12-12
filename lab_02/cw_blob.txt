@@ -1,0 +1,95 @@
+1.
+CREATE TABLE movies (
+    id NUMBER(12) PRIMARY KEY,
+    title VARCHAR2(400) NOT NULL,
+    category VARCHAR2(50),
+    year CHAR(4),
+    cast VARCHAR2(4000),
+    director VARCHAR2(4000),
+    story VARCHAR2(4000),
+    price NUMBER(5,2),
+    cover blob,
+    mime_type VARCHAR2(50));
+
+2.
+INSERT INTO movies(id, title, category, year, cast, director, story, price, cover, mime_type)
+    SELECT d.id, d.title, d.category, SUBSTR(d.year,1,4), d.cast, d.director, d.story, d.price, c.image, c.mime_type
+    FROM DESCRIPTIONS d, COVERS c
+    WHERE d.id = c.movie_id(+);
+
+3.
+SELECT id, title FROM movies WHERE cover IS NULL;
+
+4.
+SELECT id, title, dbms_lob.getlength(cover) AS filesize FROM movies WHERE cover IS NOT NULL;
+
+5.
+SELECT id, title, dbms_lob.getlength(cover) AS filesize FROM movies WHERE cover IS NULL;
+
+6.
+SELECT directory_name, directory_path FROM dba_directories;
+
+7.
+UPDATE movies
+    SET cover = EMPTY_BLOB(), mime_type = 'image/jpeg'
+    WHERE id = 66;
+
+8.
+SELECT id, title, dbms_lob.getlength(cover) AS filesize FROM movies WHERE id=65 OR id=66;
+
+9.
+DECLARE
+    lobd BLOB;
+    fils BFILE := bfilename('ZSBD_DIR', 'escape.jpg');
+BEGIN
+    SELECT cover INTO lobd
+    FROM movies
+    WHERE id = 66
+    FOR UPDATE;
+    dbms_lob.fileopen(fils, dbms_lob.file_readonly);
+    dbms_lob.loadfromfile(lobd, fils, dbms_lob.getlength(fils));
+    dbms_lob.fileclose(fils);
+    COMMIT;
+END;
+
+10.
+CREATE TABLE temp_covers (
+    movie_id NUMBER(12),
+    image BFILE,
+    mime_type VARCHAR2(50));
+
+11.
+INSERT INTO temp_covers
+    VALUES (65, bfilename('ZSBD_DIR', 'eagles.jpg'), 'image/jpeg');
+COMMIT;
+
+12.
+SELECT movie_id, dbms_lob.getlength(image) AS filesize FROM temp_covers;
+
+13.
+DECLARE
+    bob BLOB;
+    bfil BFILE;
+    mimt VARCHAR2(50);
+BEGIN
+    SELECT image, mime_type INTO bfil, mimt
+    FROM temp_covers
+    WHERE movie_id = 65
+    FOR UPDATE;
+    dbms_lob.createtemporary(bob, TRUE);
+    dbms_lob.fileopen(bfil, dbms_lob.file_readonly);
+    dbms_lob.loadfromfile(bob, bfil, dbms_lob.getlength(bfil));
+    UPDATE movies
+        SET cover = bob, mime_type = mimt
+        WHERE id = 65;
+    dbms_lob.fileclose(bfil);
+    dbms_lob.freetemporary(bob);
+    COMMIT;
+END;
+
+14.
+SELECT id, title, dbms_lob.getlength(cover) AS filesize FROM movies WHERE id=65 OR id=66;
+
+15.
+DROP TABLE movies;
+DROP TABLE temp_covers;
