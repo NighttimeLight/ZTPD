@@ -1,0 +1,106 @@
+1.
+A.
+INSERT INTO USER_SDO_GEOM_METADATA VALUES (
+    'figury',
+    'ksztalt',
+    MDSYS.SDO_DIM_ARRAY(
+        MDSYS.SDO_DIM_ELEMENT('X', 0, 20, 0.01),
+        MDSYS.SDO_DIM_ELEMENT('Y', 0, 20, 0.01)),
+    NULL
+);
+
+B.
+SELECT SDO_TUNE.ESTIMATE_RTREE_INDEX_SIZE(3000000, 8192, 10, 2, 0) FROM DUAL;
+
+C.
+CREATE INDEX FIGURY_KSZTALT_IDX
+ON figury(ksztalt)
+INDEXTYPE IS MDSYS.SPATIAL_INDEX_V2;
+
+D.
+SELECT id
+FROM figury
+WHERE SDO_FILTER(ksztalt,
+    SDO_GEOMETRY(2001, NULL, sdo_point_type(3, 3, NULL), NULL, NULL)) = 'TRUE';
+
+E.
+SELECT id
+FROM figury
+WHERE SDO_RELATE(ksztalt,
+    SDO_GEOMETRY(2001, NULL, sdo_point_type(3, 3, NULL), NULL, NULL), 'mask=ANYINTERACT') = 'TRUE';
+
+2.
+A.
+SELECT c1.city_name miasto, SDO_NN_DISTANCE(1) odl
+FROM major_cities c1, major_cities c2
+WHERE
+    c2.city_name = 'Warsaw' AND
+    c1.city_name != 'Warsaw' AND
+    SDO_NN(c1.geom, c2.geom, 'sdo_num_res=9 unit=km', 1) = 'TRUE';
+
+B.
+SELECT c1.city_name
+FROM major_cities c1, major_cities c2
+WHERE
+    c2.city_name = 'Warsaw' AND
+    c1.city_name != 'Warsaw' AND
+    SDO_WITHIN_DISTANCE(c1.geom, c2.geom, 'distance=100 unit=km') = 'TRUE';
+
+C.
+SELECT c2.cntry_name kraj, c1.city_name miasto
+FROM major_cities c1, country_boundaries c2
+WHERE
+    c2.cntry_name = 'Slovakia' AND
+    SDO_RELATE(c1.geom, c2.geom, 'mask=COVEREDBY+INSIDE') = 'TRUE';
+
+D.
+SELECT c1.cntry_name panstwo, SDO_GEOM.SDO_DISTANCE(c1.geom, c2.geom, 1, 'unit=km') odl
+FROM country_boundaries c1, country_boundaries c2
+WHERE
+    c2.cntry_name = 'Poland' AND
+    SDO_RELATE(c1.geom, c2.geom, 'mask=ANYINTERACT') != 'TRUE';
+
+3.
+A.
+SELECT c1.cntry_name name, SDO_GEOM.SDO_LENGTH(SDO_GEOM.SDO_INTERSECTION(c1.geom, c2.geom, 1), 1, 'unit=km') odleglosc
+FROM country_boundaries c1, country_boundaries c2
+WHERE
+    c2.cntry_name = 'Poland' AND
+    SDO_RELATE(c1.geom, c2.geom, 'mask=TOUCH') = 'TRUE';
+
+B.
+SELECT c1.cntry_name
+FROM country_boundaries c1
+ORDER BY SDO_GEOM.SDO_AREA(c1.geom, 1, 'unit=SQ_KM') DESC
+FETCH FIRST 1 ROW ONLY;
+
+C.
+SELECT SDO_GEOM.SDO_AREA(SDO_GEOM.SDO_MBR(geom), 1, 'unit=SQ_KM')
+FROM (
+    SELECT SDO_AGGR_UNION(MDSYS.SDOAGGRTYPE(c1.geom,1)) geom
+    FROM major_cities  c1
+    WHERE
+        c1.city_name = 'Warsaw' OR
+        c1.city_name = 'Lodz');
+
+D.
+SELECT SDO_GEOM.SDO_UNION(c1.geom, c2.geom, 1).GET_GTYPE()
+FROM major_cities  c1, country_boundaries c2
+WHERE
+    c1.city_name = 'Prague' AND
+    c2.cntry_name = 'Poland';
+
+E.
+SELECT city_name, c1.cntry_name
+FROM (SELECT SDO_GEOM.SDO_CENTROID(geom,1) centr, cntry_name FROM country_boundaries) c1, major_cities c2
+WHERE c1.cntry_name = c2.cntry_name
+ORDER BY SDO_GEOM.SDO_DISTANCE(c1.centr, c2.geom, 1, 'unit=km')
+FETCH FIRST 1 ROW ONLY;
+
+F.
+SELECT name, SDO_GEOM.SDO_LENGTH(geom, 1, 'unit=km') dlugosc
+FROM (
+    SELECT r1.name, SDO_GEOM.SDO_INTERSECTION(c1.geom, r1.geom, 10) geom
+    FROM country_boundaries c1, rivers r1
+    WHERE c1.cntry_name = 'Poland' AND
+        SDO_RELATE(c1.geom, r1.geom, 'mask=ANYINTERACT') = 'TRUE');
