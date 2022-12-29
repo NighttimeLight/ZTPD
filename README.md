@@ -6,3 +6,4 @@ Toc:
 1. object-relational databases
 2. large objects in databases
 3. spatial databases
+4. Oracle Text
