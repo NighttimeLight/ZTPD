@@ -26,6 +26,10 @@ public class KursAkcji {
 		this.obrot = obrot;
 	}
 
+	public static Float roznica(Float open, Float close) {
+		return close-open;
+	}
+
 	@Override
 	public String toString() {
 		return "KursAkcji   [spolka=" + spolka + ",\tmarket=" + market
